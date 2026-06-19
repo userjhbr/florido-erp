@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, Package, Users, ShoppingCart, ClipboardList,
   Wallet, Plus, Trash2, Edit2, X, Search, TrendingUp, TrendingDown,
-  AlertTriangle, Flower2
+  AlertTriangle, Flower2, Lock, Eye, EyeOff
 } from 'lucide-react';
 import {
   loadAllData,
@@ -13,12 +13,100 @@ import {
   inserirLancamento, deleteLancamento,
 } from './db';
 
-// ---------- Helpers ----------
+// ---------- Senha de acesso ----------
+const SENHA_CORRETA = 'Quq@ee20@26';
+const SESSION_KEY = 'florido-auth';
+
+// ---------- Tela de Login ----------
+function TelaLogin({ onLogin }) {
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState(false);
+  const [mostrar, setMostrar] = useState(false);
+
+  const tentar = () => {
+    if (senha === SENHA_CORRETA) {
+      sessionStorage.setItem(SESSION_KEY, '1');
+      onLogin();
+    } else {
+      setErro(true);
+      setSenha('');
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#f0faf5', fontFamily: 'var(--font-sans, sans-serif)'
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: '2.5rem 2rem',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)', width: '100%', maxWidth: 360,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem'
+      }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 14, background: '#E1F5EE',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <Flower2 size={26} color="#085041" />
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ margin: 0 }}>Florido ERP</h2>
+          <p style={{ margin: '4px 0 0', color: '#666', fontSize: 14 }}>Digite a senha para entrar</p>
+        </div>
+
+        <div style={{ width: '100%', position: 'relative' }}>
+          <input
+            type={mostrar ? 'text' : 'password'}
+            placeholder="Senha"
+            value={senha}
+            onChange={(e) => { setSenha(e.target.value); setErro(false); }}
+            onKeyDown={(e) => e.key === 'Enter' && tentar()}
+            style={{
+              width: '100%', padding: '10px 40px 10px 14px',
+              border: erro ? '1.5px solid #c0392b' : '1.5px solid #ddd',
+              borderRadius: 8, fontSize: 15, boxSizing: 'border-box'
+            }}
+            autoFocus
+          />
+          <button
+            onClick={() => setMostrar((v) => !v)}
+            style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#888'
+            }}
+          >
+            {mostrar ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+
+        {erro && <p style={{ margin: 0, color: '#c0392b', fontSize: 13 }}>Senha incorreta. Tente novamente.</p>}
+
+        <button
+          onClick={tentar}
+          style={{
+            width: '100%', padding: '11px', background: '#085041', color: '#fff',
+            border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: 'pointer'
+          }}
+        >
+          Entrar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 const fmtBRL = (n) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+
+// ---------- Helpers ----------
+const fmtBRL = (n) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
 // ---------- Reusable UI ----------
 function Card({ children, style = {} }) {
@@ -119,9 +207,16 @@ const STATUS_COLOR = { Pendente: 'amber', 'Em preparo': 'blue', Pronto: 'teal', 
 
 // ---------- Main App ----------
 export default function FloriculturaERP() {
+  const [autenticado, setAutenticado] = useState(
+    () => sessionStorage.getItem(SESSION_KEY) === '1'
+  );
   const [data, setData] = useState(null);
   const [tab, setTab] = useState('dashboard');
   const [erro, setErro] = useState(null);
+
+  if (!autenticado) {
+    return <TelaLogin onLogin={() => setAutenticado(true)} />;
+  }
 
   useEffect(() => {
     loadAllData().then(setData).catch((e) => setErro(e.message || String(e)));
