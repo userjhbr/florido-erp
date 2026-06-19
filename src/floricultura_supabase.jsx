@@ -208,17 +208,18 @@ export default function FloriculturaERP() {
   const [tab, setTab] = useState('dashboard');
   const [erro, setErro] = useState(null);
 
-  if (!autenticado) {
-    return <TelaLogin onLogin={() => setAutenticado(true)} />;
-  }
-
   useEffect(() => {
+    if (!autenticado) return;
     loadAllData().then(setData).catch((e) => setErro(e.message || String(e)));
-  }, []);
+  }, [autenticado]);
 
   const update = useCallback((key, fn) => {
     setData((prev) => ({ ...prev, [key]: fn(prev[key]) }));
   }, []);
+
+  if (!autenticado) {
+    return <TelaLogin onLogin={() => setAutenticado(true)} />;
+  }
 
   if (erro) {
     return (
