@@ -96,12 +96,6 @@ function TelaLogin({ onLogin }) {
 }
 
 
-const fmtBRL = (n) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
-
-const todayISO = () => new Date().toISOString().slice(0, 10);
-
-
 // ---------- Helpers ----------
 const fmtBRL = (n) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0);
