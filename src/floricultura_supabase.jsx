@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, Package, Users, ShoppingCart, ClipboardList,
   Wallet, Plus, Trash2, Edit2, X, Search, TrendingUp, TrendingDown,
-  AlertTriangle, Flower2, Lock, Eye, EyeOff
+  AlertTriangle, Flower2, Lock, Eye, EyeOff, BarChart2, Star, Award
 } from 'lucide-react';
 import {
   loadAllData,
@@ -245,6 +245,7 @@ export default function FloriculturaERP() {
     { id: 'vendas', label: 'Vendas', icon: ShoppingCart },
     { id: 'pedidos', label: 'Encomendas', icon: ClipboardList },
     { id: 'financeiro', label: 'Financeiro', icon: Wallet },
+    { id: 'relatorios', label: 'Relatórios', icon: BarChart2 },
   ];
 
   return (
@@ -311,6 +312,9 @@ export default function FloriculturaERP() {
         )}
         {tab === 'financeiro' && (
           <Financeiro financeiro={data.financeiro} setFinanceiro={(fn) => update('financeiro', fn)} />
+        )}
+        {tab === 'relatorios' && (
+          <Relatorios vendas={data.vendas} clientes={data.clientes} produtos={data.produtos} />
         )}
       </div>
     </div>
@@ -958,5 +962,177 @@ function LancamentoModal({ lancamento, onSave, onClose }) {
         <button onClick={() => onSave({ ...form, valor: Number(form.valor) || 0 })} disabled={!form.descricao || !form.valor}>Salvar</button>
       </div>
     </Modal>
+  );
+}
+
+// ---------- Relatórios ----------
+function Relatorios({ vendas, clientes, produtos }) {
+  const [periodo, setPeriodo] = useState('todos');
+
+  const filtrar = (lista) => {
+    if (periodo === 'todos') return lista;
+    const agora = new Date();
+    const dias = periodo === '30' ? 30 : periodo === '90' ? 90 : 365;
+    const corte = new Date(agora - dias * 86400000).toISOString().slice(0, 10);
+    return lista.filter((v) => v.data >= corte);
+  };
+
+  const vendasFiltradas = filtrar(vendas);
+
+  // Produtos mais vendidos
+  const contagemProdutos = {};
+  vendasFiltradas.forEach((v) => {
+    v.itens.forEach((item) => {
+      if (!contagemProdutos[item.nome]) contagemProdutos[item.nome] = { qtd: 0, receita: 0 };
+      contagemProdutos[item.nome].qtd += item.qtd;
+      contagemProdutos[item.nome].receita += item.qtd * item.precoUnit;
+    });
+  });
+  const topProdutos = Object.entries(contagemProdutos)
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.qtd - a.qtd)
+    .slice(0, 8);
+
+  const maxQtd = topProdutos[0]?.qtd || 1;
+
+  // Clientes que mais compram
+  const contagemClientes = {};
+  vendasFiltradas.forEach((v) => {
+    if (!v.clienteNome) return;
+    const key = v.clienteNome;
+    if (!contagemClientes[key]) contagemClientes[key] = { compras: 0, total: 0 };
+    contagemClientes[key].compras += 1;
+    contagemClientes[key].total += v.total;
+  });
+  const topClientes = Object.entries(contagemClientes)
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
+  const maxTotal = topClientes[0]?.total || 1;
+
+  const totalReceita = vendasFiltradas.reduce((s, v) => s + v.total, 0);
+  const totalVendas = vendasFiltradas.length;
+  const ticketMedio = totalVendas > 0 ? totalReceita / totalVendas : 0;
+
+  const cores = ['#085041', '#0d7a5f', '#12a67e', '#17d19e', '#4de8bb', '#80f0cf', '#b3f8e3', '#d9fcf2'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Período:</span>
+        {[['todos', 'Tudo'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['365', 'Último ano']].map(([v, l]) => (
+          <button
+            key={v}
+            onClick={() => setPeriodo(v)}
+            style={{
+              border: 'none',
+              background: periodo === v ? '#085041' : 'var(--color-background-secondary)',
+              color: periodo === v ? '#fff' : 'var(--color-text-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              fontSize: 13, fontWeight: periodo === v ? 500 : 400,
+            }}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+        {[
+          { label: 'Total de vendas', value: totalVendas + ' vendas', icon: <ShoppingCart size={16} /> },
+          { label: 'Receita total', value: fmtBRL(totalReceita), icon: <TrendingUp size={16} /> },
+          { label: 'Ticket médio', value: fmtBRL(ticketMedio), icon: <Award size={16} /> },
+        ].map((m) => (
+          <Card key={m.label}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{m.label}</span>
+              {m.icon}
+            </div>
+            <span style={{ fontSize: 20, fontWeight: 500 }}>{m.value}</span>
+          </Card>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
+            <Star size={16} color="#085041" />
+            <h3 style={{ margin: 0 }}>Produtos mais vendidos</h3>
+          </div>
+          {topProdutos.length === 0 ? (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>Nenhuma venda no período.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {topProdutos.map((p, i) => (
+                <div key={p.nome}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        width: 20, height: 20, borderRadius: '50%',
+                        background: cores[i] || '#ccc',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0
+                      }}>{i + 1}</span>
+                      {p.nome}
+                    </span>
+                    <span style={{ color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                      {p.qtd} un · {fmtBRL(p.receita)}
+                    </span>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--color-background-secondary)', borderRadius: 99 }}>
+                    <div style={{
+                      height: 6, borderRadius: 99,
+                      width: `${(p.qtd / maxQtd) * 100}%`,
+                      background: cores[i] || '#ccc',
+                      transition: 'width 0.5s ease'
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
+            <Award size={16} color="#085041" />
+            <h3 style={{ margin: 0 }}>Clientes que mais compram</h3>
+          </div>
+          {topClientes.length === 0 ? (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>Nenhuma venda com cliente no período.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {topClientes.map((c, i) => (
+                <div key={c.nome}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        width: 20, height: 20, borderRadius: '50%',
+                        background: cores[i] || '#ccc',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0
+                      }}>{i + 1}</span>
+                      {c.nome}
+                    </span>
+                    <span style={{ color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                      {c.compras} compra{c.compras > 1 ? 's' : ''} · {fmtBRL(c.total)}
+                    </span>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--color-background-secondary)', borderRadius: 99 }}>
+                    <div style={{
+                      height: 6, borderRadius: 99,
+                      width: `${(c.total / maxTotal) * 100}%`,
+                      background: cores[i] || '#ccc',
+                      transition: 'width 0.5s ease'
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }
