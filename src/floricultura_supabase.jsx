@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, Package, Users, ShoppingCart, ClipboardList,
   Wallet, Plus, Trash2, Edit2, X, Search, TrendingUp, TrendingDown,
-  AlertTriangle, Flower2, Lock, Eye, EyeOff, BarChart2, Star, Award
+  AlertTriangle, Flower2, Lock, Eye, EyeOff, BarChart2, Star, Award, MessageSquare, Send
 } from 'lucide-react';
 import {
   loadAllData,
@@ -246,6 +246,7 @@ export default function FloriculturaERP() {
     { id: 'pedidos', label: 'Encomendas', icon: ClipboardList },
     { id: 'financeiro', label: 'Financeiro', icon: Wallet },
     { id: 'relatorios', label: 'Relatórios', icon: BarChart2 },
+    { id: 'assistente', label: 'Assistente IA', icon: MessageSquare },
   ];
 
   return (
@@ -316,6 +317,7 @@ export default function FloriculturaERP() {
         {tab === 'relatorios' && (
           <Relatorios vendas={data.vendas} clientes={data.clientes} produtos={data.produtos} />
         )}
+        {tab === 'assistente' && <Assistente />}
       </div>
     </div>
   );
@@ -1132,6 +1134,136 @@ function Relatorios({ vendas, clientes, produtos }) {
             </div>
           )}
         </Card>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Assistente IA ----------
+const SUGESTOES = [
+  'Qual produto mais vendido esse mês?',
+  'Quem encomendou mais essa semana?',
+  'Quem está esperando há mais tempo?',
+  'Quanto tenho em estoque de cada produto?',
+  'Qual meu faturamento total?',
+  'Quais pedidos ainda estão pendentes?',
+];
+
+function Assistente() {
+  const [mensagens, setMensagens] = useState([
+    { tipo: 'bot', texto: '👋 Olá! Sou seu assistente inteligente. Pode me perguntar qualquer coisa sobre suas vendas, estoque, clientes e encomendas!' }
+  ]);
+  const [pergunta, setPergunta] = useState('');
+  const [carregando, setCarregando] = useState(false);
+  const fimRef = React.useRef(null);
+
+  useEffect(() => {
+    fimRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [mensagens]);
+
+  const enviar = async (texto) => {
+    const p = texto || pergunta;
+    if (!p.trim() || carregando) return;
+    setPergunta('');
+    setMensagens((m) => [...m, { tipo: 'usuario', texto: p }]);
+    setCarregando(true);
+    try {
+      const res = await fetch('/api/assistente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pergunta: p }),
+      });
+      const dados = await res.json();
+      setMensagens((m) => [...m, { tipo: 'bot', texto: dados.resposta || dados.erro || 'Erro ao responder.' }]);
+    } catch (e) {
+      setMensagens((m) => [...m, { tipo: 'bot', texto: '❌ Erro de conexão. Tente novamente.' }]);
+    }
+    setCarregando(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 700 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: '50%', background: '#E1F5EE',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <MessageSquare size={18} color="#085041" />
+        </div>
+        <div>
+          <h3 style={{ margin: 0 }}>Assistente Inteligente</h3>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Pergunte qualquer coisa sobre o seu negócio</p>
+        </div>
+      </div>
+
+      {/* Sugestões */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {SUGESTOES.map((s) => (
+          <button
+            key={s}
+            onClick={() => enviar(s)}
+            disabled={carregando}
+            style={{
+              fontSize: 12, padding: '4px 12px',
+              background: 'var(--color-background-secondary)',
+              border: '0.5px solid var(--color-border-tertiary)',
+              borderRadius: 99, cursor: 'pointer',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Chat */}
+      <Card style={{ minHeight: 320, maxHeight: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {mensagens.map((m, i) => (
+          <div key={i} style={{
+            display: 'flex',
+            justifyContent: m.tipo === 'usuario' ? 'flex-end' : 'flex-start',
+          }}>
+            <div style={{
+              maxWidth: '80%',
+              padding: '10px 14px',
+              borderRadius: m.tipo === 'usuario' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+              background: m.tipo === 'usuario' ? '#085041' : 'var(--color-background-secondary)',
+              color: m.tipo === 'usuario' ? '#fff' : 'var(--color-text-primary)',
+              fontSize: 14,
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
+            }}>
+              {m.texto}
+            </div>
+          </div>
+        ))}
+        {carregando && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{
+              padding: '10px 16px', borderRadius: '16px 16px 16px 4px',
+              background: 'var(--color-background-secondary)', fontSize: 14,
+              color: 'var(--color-text-secondary)'
+            }}>
+              Analisando os dados... ⏳
+            </div>
+          </div>
+        )}
+        <div ref={fimRef} />
+      </Card>
+
+      {/* Input */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={pergunta}
+          onChange={(e) => setPergunta(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && enviar()}
+          placeholder="Digite sua pergunta..."
+          disabled={carregando}
+          style={{ flex: 1 }}
+        />
+        <button onClick={() => enviar()} disabled={!pergunta.trim() || carregando} style={{ width: 44, padding: 0 }}>
+          <Send size={16} />
+        </button>
       </div>
     </div>
   );
