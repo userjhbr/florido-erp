@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Package, Users, ShoppingCart, ClipboardList,
   Wallet, Plus, Trash2, Edit2, X, Search, TrendingUp, TrendingDown,
-  AlertTriangle, Flower2, Lock, Eye, EyeOff, BarChart2, Star, Award, MessageSquare, Send
+  AlertTriangle, Flower2, Lock, Eye, EyeOff, BarChart2, Star, Award,
+  MessageSquare, Send, Megaphone, CheckCircle, XCircle, Copy, ExternalLink
 } from 'lucide-react';
 import {
   loadAllData,
@@ -246,6 +247,7 @@ export default function FloriculturaERP() {
     { id: 'pedidos', label: 'Encomendas', icon: ClipboardList },
     { id: 'financeiro', label: 'Financeiro', icon: Wallet },
     { id: 'relatorios', label: 'Relatórios', icon: BarChart2 },
+    { id: 'campanhas', label: 'Campanhas', icon: Megaphone },
     { id: 'assistente', label: 'Assistente IA', icon: MessageSquare },
   ];
 
@@ -317,6 +319,7 @@ export default function FloriculturaERP() {
         {tab === 'relatorios' && (
           <Relatorios vendas={data.vendas} clientes={data.clientes} produtos={data.produtos} />
         )}
+        {tab === 'campanhas' && <Campanhas clientes={data.clientes} />}
         {tab === 'assistente' && <Assistente />}
       </div>
     </div>
@@ -602,7 +605,6 @@ function Vendas({ vendas, setVendas, produtos, setProdutos, clientes, financeiro
   const registrarVenda = async (venda) => {
     const vendaSalva = await inserirVenda(venda);
 
-    // baixa estoque (local + banco)
     const novosEstoques = [];
     setProdutos((list) =>
       list.map((p) => {
@@ -617,7 +619,6 @@ function Vendas({ vendas, setVendas, produtos, setProdutos, clientes, financeiro
 
     setVendas((list) => [vendaSalva, ...list]);
 
-    // lança no financeiro
     const lancamento = await inserirLancamento({
       tipo: 'entrada',
       categoria: 'Venda',
@@ -981,7 +982,6 @@ function Relatorios({ vendas, clientes, produtos }) {
 
   const vendasFiltradas = filtrar(vendas);
 
-  // Produtos mais vendidos
   const contagemProdutos = {};
   vendasFiltradas.forEach((v) => {
     v.itens.forEach((item) => {
@@ -997,7 +997,6 @@ function Relatorios({ vendas, clientes, produtos }) {
 
   const maxQtd = topProdutos[0]?.qtd || 1;
 
-  // Clientes que mais compram
   const contagemClientes = {};
   vendasFiltradas.forEach((v) => {
     if (!v.clienteNome) return;
@@ -1139,34 +1138,214 @@ function Relatorios({ vendas, clientes, produtos }) {
   );
 }
 
-// ---------- Assistente IA ----------
+// ---------- Campanhas ----------
+const TEMPLATES_CAMPANHA = [
+  {
+    id: 'promocao',
+    label: '🌸 Promoção',
+    texto: '🌸 *PROMOÇÃO FLORIDO* 🌸\n\nOlá! Temos ofertas especiais essa semana:\n\n🌷 {produto1} — de {preco_de} por {preco_por}\n🌹 {produto2} — de {preco_de2} por {preco_por2}\n\nVálido até {validade}. Aproveite! 💐\n\n📞 Encomende: {telefone}',
+  },
+  {
+    id: 'datas',
+    label: '💝 Data especial',
+    texto: '💝 *{data_comemorativa} se aproxima!* 💝\n\nNão esqueça de presentear quem você ama! 🌹\n\nTemos arranjos, buquês e vasos a partir de R$ {preco_inicial}.\n\nFaça seu pedido com antecedência! ⏰\n\n📞 {telefone}\n📍 {endereco}',
+  },
+  {
+    id: 'novo_produto',
+    label: '✨ Novo produto',
+    texto: '✨ *NOVIDADE NA FLORIDO!* ✨\n\nAcabou de chegar: *{nome_produto}* 🌺\n\n{descricao}\n\nPreço especial de lançamento: *R$ {preco}*\n\nQuantidade limitada! Corra garantir o seu 🏃‍♀️\n\n📞 {telefone}',
+  },
+  {
+    id: 'livre',
+    label: '✏️ Mensagem livre',
+    texto: '',
+  },
+];
+
+function Campanhas({ clientes }) {
+  const [template, setTemplate] = useState(TEMPLATES_CAMPANHA[0].id);
+  const [mensagem, setMensagem] = useState(TEMPLATES_CAMPANHA[0].texto);
+  const [copiado, setCopiado] = useState(false);
+
+  const selecionarTemplate = (id) => {
+    setTemplate(id);
+    const t = TEMPLATES_CAMPANHA.find((t) => t.id === id);
+    setMensagem(t?.texto || '');
+    setCopiado(false);
+  };
+
+  const abrirWhatsApp = () => {
+    const encoded = encodeURIComponent(mensagem);
+    window.open(`https://web.whatsapp.com/send?text=${encoded}`, '_blank');
+  };
+
+  const copiar = () => {
+    navigator.clipboard.writeText(mensagem).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    });
+  };
+
+  const chars = mensagem.length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 700 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: '50%', background: '#E1F5EE',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+        }}>
+          <Megaphone size={18} color="#085041" />
+        </div>
+        <div>
+          <h3 style={{ margin: 0 }}>Campanhas WhatsApp</h3>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            Monte sua mensagem e abra direto no WhatsApp Web para colar no grupo
+          </p>
+        </div>
+      </div>
+
+      {/* Templates */}
+      <div>
+        <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Modelo</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {TEMPLATES_CAMPANHA.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => selecionarTemplate(t.id)}
+              style={{
+                fontSize: 13, padding: '6px 14px',
+                background: template === t.id ? '#085041' : 'var(--color-background-secondary)',
+                color: template === t.id ? '#fff' : 'var(--color-text-secondary)',
+                border: template === t.id ? 'none' : '0.5px solid var(--color-border-tertiary)',
+                borderRadius: 99, cursor: 'pointer', fontWeight: template === t.id ? 500 : 400,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Editor */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Mensagem</p>
+          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{chars} caracteres</span>
+        </div>
+        <textarea
+          value={mensagem}
+          onChange={(e) => setMensagem(e.target.value)}
+          rows={10}
+          placeholder="Digite sua mensagem aqui. Use *negrito*, _itálico_ e emojis — fica lindo no WhatsApp! 🌸"
+          style={{
+            width: '100%', boxSizing: 'border-box', resize: 'vertical',
+            fontFamily: 'monospace', fontSize: 13, lineHeight: 1.6,
+            padding: '10px 12px',
+            border: '0.5px solid var(--color-border-tertiary)',
+            borderRadius: 'var(--border-radius-md)',
+          }}
+        />
+        {template !== 'livre' && (
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+            💡 Substitua os campos entre {'{}'} pelo conteúdo real antes de enviar.
+          </p>
+        )}
+      </div>
+
+      {/* Preview */}
+      {mensagem.trim() && (
+        <Card style={{ background: '#f0faf5' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#085041', fontWeight: 600, letterSpacing: 0.5 }}>PRÉVIA</p>
+          <div style={{
+            background: '#fff', borderRadius: 12, padding: '10px 14px',
+            fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            maxHeight: 200, overflowY: 'auto',
+          }}>
+            {mensagem
+              .replace(/\*(.*?)\*/g, (_, t) => `**${t}**`)
+              .replace(/_(.*?)_/g, (_, t) => `_${t}_`)}
+          </div>
+        </Card>
+      )}
+
+      {/* Ações */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          onClick={copiar}
+          disabled={!mensagem.trim()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '10px 18px', fontSize: 14,
+            background: copiado ? '#EAF3DE' : 'var(--color-background-secondary)',
+            color: copiado ? '#27500A' : 'var(--color-text-primary)',
+            border: '0.5px solid var(--color-border-tertiary)',
+            borderRadius: 8, cursor: 'pointer', fontWeight: 500,
+          }}
+        >
+          {copiado ? <CheckCircle size={16} /> : <Copy size={16} />}
+          {copiado ? 'Copiado!' : 'Copiar texto'}
+        </button>
+
+        <button
+          onClick={abrirWhatsApp}
+          disabled={!mensagem.trim()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '10px 20px', fontSize: 14, fontWeight: 600,
+            background: mensagem.trim() ? '#25D366' : '#ccc',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8, cursor: mensagem.trim() ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <ExternalLink size={16} />
+          Abrir no WhatsApp Web
+        </button>
+      </div>
+
+      <p style={{ margin: 0, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+        O WhatsApp Web abrirá com a mensagem pronta no campo de texto. Selecione o grupo e envie.
+      </p>
+    </div>
+  );
+}
+
+
+// ---------- Assistente IA (com edição + confirmação) ----------
 const SUGESTOES = [
   'Qual produto mais vendido esse mês?',
   'Quem encomendou mais essa semana?',
-  'Quem está esperando há mais tempo?',
-  'Quanto tenho em estoque de cada produto?',
+  'Quanto tenho em estoque?',
   'Qual meu faturamento total?',
-  'Quais pedidos ainda estão pendentes?',
+  'Cadastra o cliente Maria Silva, tel 11 99999-0000',
+  'Cria pedido para João: buquê de rosas, entrega amanhã, R$ 120',
 ];
 
 function Assistente() {
   const [mensagens, setMensagens] = useState([
-    { tipo: 'bot', texto: '👋 Olá! Sou seu assistente inteligente. Pode me perguntar qualquer coisa sobre suas vendas, estoque, clientes e encomendas!' }
+    { tipo: 'bot', texto: '👋 Olá! Sou a Flor, sua assistente inteligente. Posso responder perguntas sobre vendas, estoque e clientes — e também *cadastrar clientes, produtos, pedidos* e lançamentos financeiros por você!\n\nSó me diga o que precisa 🌸' }
   ]);
   const [pergunta, setPergunta] = useState('');
   const [carregando, setCarregando] = useState(false);
-  const fimRef = React.useRef(null);
+  // Operação pendente de confirmação
+  const [pendente, setPendente] = useState(null);
+  const fimRef = useRef(null);
 
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [mensagens]);
+  }, [mensagens, pendente]);
 
   const enviar = async (texto) => {
     const p = texto || pergunta;
     if (!p.trim() || carregando) return;
     setPergunta('');
+    setPendente(null);
     setMensagens((m) => [...m, { tipo: 'usuario', texto: p }]);
     setCarregando(true);
+
     try {
       const res = await fetch('/api/assistente', {
         method: 'POST',
@@ -1174,15 +1353,50 @@ function Assistente() {
         body: JSON.stringify({ pergunta: p }),
       });
       const dados = await res.json();
-      setMensagens((m) => [...m, { tipo: 'bot', texto: dados.resposta || dados.erro || 'Erro ao responder.' }]);
-    } catch (e) {
+
+      if (dados.erro) {
+        setMensagens((m) => [...m, { tipo: 'bot', texto: '❌ ' + dados.erro }]);
+      } else if (dados.requer_confirmacao) {
+        setMensagens((m) => [...m, { tipo: 'bot', texto: dados.resposta }]);
+        setPendente({ operacao: dados.operacao_pendente, preview: dados.preview });
+      } else {
+        setMensagens((m) => [...m, { tipo: 'bot', texto: dados.resposta }]);
+      }
+    } catch {
       setMensagens((m) => [...m, { tipo: 'bot', texto: '❌ Erro de conexão. Tente novamente.' }]);
     }
     setCarregando(false);
   };
 
+  const confirmar = async () => {
+    if (!pendente) return;
+    setMensagens((m) => [...m, { tipo: 'usuario', texto: '✅ Sim, pode salvar.' }]);
+    setPendente(null);
+    setCarregando(true);
+
+    try {
+      const res = await fetch('/api/assistente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmar: true, operacao_pendente: pendente.operacao }),
+      });
+      const dados = await res.json();
+      setMensagens((m) => [...m, { tipo: 'bot', texto: dados.resposta || dados.erro || 'Concluído.' }]);
+    } catch {
+      setMensagens((m) => [...m, { tipo: 'bot', texto: '❌ Erro ao salvar. Tente novamente.' }]);
+    }
+    setCarregando(false);
+  };
+
+  const cancelar = () => {
+    setMensagens((m) => [...m, { tipo: 'usuario', texto: '❌ Não, cancelar.' }]);
+    setMensagens((m) => [...m, { tipo: 'bot', texto: 'Tudo bem, operação cancelada. Posso ajudar com mais alguma coisa? 😊' }]);
+    setPendente(null);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 700 }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{
           width: 36, height: 36, borderRadius: '50%', background: '#E1F5EE',
@@ -1191,8 +1405,10 @@ function Assistente() {
           <MessageSquare size={18} color="#085041" />
         </div>
         <div>
-          <h3 style={{ margin: 0 }}>Assistente Inteligente</h3>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Pergunte qualquer coisa sobre o seu negócio</p>
+          <h3 style={{ margin: 0 }}>Assistente Inteligente · Flor</h3>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            Consulta e edita o banco com sua confirmação
+          </p>
         </div>
       </div>
 
@@ -1217,26 +1433,21 @@ function Assistente() {
       </div>
 
       {/* Chat */}
-      <Card style={{ minHeight: 320, maxHeight: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Card style={{ minHeight: 320, maxHeight: 440, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {mensagens.map((m, i) => (
-          <div key={i} style={{
-            display: 'flex',
-            justifyContent: m.tipo === 'usuario' ? 'flex-end' : 'flex-start',
-          }}>
+          <div key={i} style={{ display: 'flex', justifyContent: m.tipo === 'usuario' ? 'flex-end' : 'flex-start' }}>
             <div style={{
-              maxWidth: '80%',
-              padding: '10px 14px',
+              maxWidth: '80%', padding: '10px 14px',
               borderRadius: m.tipo === 'usuario' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
               background: m.tipo === 'usuario' ? '#085041' : 'var(--color-background-secondary)',
               color: m.tipo === 'usuario' ? '#fff' : 'var(--color-text-primary)',
-              fontSize: 14,
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap',
+              fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap',
             }}>
               {m.texto}
             </div>
           </div>
         ))}
+
         {carregando && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <div style={{
@@ -1244,10 +1455,57 @@ function Assistente() {
               background: 'var(--color-background-secondary)', fontSize: 14,
               color: 'var(--color-text-secondary)'
             }}>
-              Analisando os dados... ⏳
+              Analisando... ⏳
             </div>
           </div>
         )}
+
+        {/* Card de confirmação */}
+        {pendente && !carregando && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{
+              maxWidth: '90%', padding: '12px 14px',
+              borderRadius: '16px 16px 16px 4px',
+              background: '#FFF9E6',
+              border: '1px solid #F0C040',
+              fontSize: 14,
+            }}>
+              <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#7A5500' }}>
+                ⚠️ Confirmar operação?
+              </p>
+              {pendente.preview?.detalhes?.map((d) => (
+                <div key={d.label} style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 3 }}>
+                  <span style={{ color: '#7A5500', minWidth: 80, fontWeight: 500 }}>{d.label}:</span>
+                  <span style={{ color: '#333' }}>{d.valor}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button
+                  onClick={confirmar}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: '#085041', color: '#fff', border: 'none',
+                    borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  <CheckCircle size={14} /> Confirmar
+                </button>
+                <button
+                  onClick={cancelar}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: 'transparent', color: '#791F1F',
+                    border: '1px solid #F5C6C6',
+                    borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                  }}
+                >
+                  <XCircle size={14} /> Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={fimRef} />
       </Card>
 
@@ -1257,7 +1515,7 @@ function Assistente() {
           value={pergunta}
           onChange={(e) => setPergunta(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && enviar()}
-          placeholder="Digite sua pergunta..."
+          placeholder='Pergunte ou peça algo, ex: "cadastra cliente Ana, tel 11 98888-0000"'
           disabled={carregando}
           style={{ flex: 1 }}
         />
